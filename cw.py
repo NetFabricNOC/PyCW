@@ -9,7 +9,7 @@ logging.basicConfig(filename='/var/log/zabbix/cw.log', level=logging.ERROR)
 logging.info('processing the parameters into local variables')
 logging.debug(f"Dumping the raw cmd: {sys.argv[0:]}")
 parsletongue = argparse.ArgumentParser(description='Creates/Updates tickets in connectwise from zabbix')
-parsletongue.add_argument('--action', metavar=('action'), type=str, help="dafuq you want me to do with this ticket", dest="action")
+parsletongue.add_argument('--action', metavar=('action'), type=str, help="what do you want me to do with this ticket", dest="action")
 parsletongue.add_argument('--payload', metavar=('payload'), type=str, help="json encoded payload from the message body section", dest="payload")
 logging.info('setting the common headers for the request')
 
@@ -119,7 +119,7 @@ def createTicket(nsev: int, summary: str, body: str, proxy: str):
     return "created ticket"
 
 def fail(msg: str):
-    logging.error("wierd shit is happening, haaaaaalp. " + msg)
+    logging.error("wierd stuff is happening, haaaaaalp. " + msg)
 
 def chkVar(value: str):
     if type(value) != int:
