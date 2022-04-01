@@ -1,11 +1,13 @@
 #!/usr/bin/python3
 
-import sys, requests, logging, argparse, json, shelve
+import sys, requests, logging, argparse, json, shelve, yaml
 
 # region
 # init the logger config and parse the args
+with open(r'config.yaml') as configFile:
+    fromYaml = yaml.load(configFile, Loader=yaml.FullLoader)
 
-logging.basicConfig(filename='/var/log/zabbix/cw.log', level=logging.ERROR)
+logging.basicConfig(filename='/var/log/zabbix/cw.log', level=fromYaml['logLevel'])
 logging.info('processing the parameters into local variables')
 logging.debug(f"Dumping the raw cmd: {sys.argv[0:]}")
 parsletongue = argparse.ArgumentParser(description='Creates/Updates tickets in connectwise from zabbix')
@@ -15,9 +17,7 @@ logging.info('setting the common headers for the request')
 
 # init config variables
 
-authID = ""
-clientID = ""
-commonHeaders = {"Authorization": 'Basic  ', "clientID": '', "content-type": "application/json", "Accept": "application/json"}
+commonHeaders = f"""{{"Authorization": '{fromYaml['Auth']}', "clientID": '{fromYaml['ClientID']}', "content-type": "application/json", "Accept": "application/json"}}"""
 baseURL = "https://api-na.myconnectwise.net/v4_6_release/apis/3.0/"
 logging.debug(commonHeaders)
 parseList = parsletongue.parse_args()
@@ -27,7 +27,7 @@ logging.debug(parseList)
 # endregion
 
 # misc and sundry function definition
-
+#TODO make this whole block obsolete, tag the problems with the connectwise ticket numbers and add callback functions to connectwise
 def add_ticket(problemID: int, ticketID: int):
     ticket_map = shelve.open("/usr/lib/zabbix/alertscripts/tickets.dat")
     ticket_map[str(problemID)] = str(ticketID)
@@ -69,7 +69,7 @@ def updateTicket(ticketID: int, update: str):
 
     return "updated the ticket"
 
-def createTicket(nsev: int, summary: str, body: str, proxy: str):
+def createTicket(nsev: int, summary: str, body: str, proxy: str = "default"):
     board, company = "", ''
     if nsev <= 2:
         severity = "Low"
@@ -88,24 +88,22 @@ def createTicket(nsev: int, summary: str, body: str, proxy: str):
     else:
         prefix = proxy
     logging.debug("Found prefix: %s", prefix)
-    if prefix == "customer":
-        board = "noc board"
-        company = "customer"
-    elif prefix == "other_customer":
-        board = "helpdesk board"
-        company = "other_customer"
-    else:
-        board = "default board"
-        company = "msp"
+    for client in fromYaml['Clients']:
+        if prefix == client['Prefix']:
+            board = client['Board']
+            company = client['CustomerID']
+    if board == "":
+        board = fromYaml['Clients'][0]['Board']
+        company = fromYaml['Clients'][0]['CustomerID']
     logging.debug("Setting board and company to: %s %s", board, company)
     compilation = f"""
     {{
-        "summary": "{summary}", 
-        "recordType": "ServiceTicket", 
-        "severity": "{severity}", 
-        "impact": "{impact}", 
-        "initialDescription": "{body}", 
-        "board": {{"name": "{board}"}}, 
+        "summary": "{summary}",
+        "recordType": "ServiceTicket",
+        "severity": "{severity}",
+        "impact": "{impact}",
+        "initialDescription": "{body}",
+        "board": {{"name": "{board}"}},
         "company": {{"identifier": "{company}"}}
         }}
         """
