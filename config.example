@@ -1,0 +1,9 @@
+# ClientID is something you have to get from connecwise
+  - ClientID: null
+  # auth string is companyid+publickey:privatekey base64'd (and yes thats with the + and :, for some reason)
+  - Auth: Basic null
+  # client list is where I plan on putting the data to replace the expanding if/elif chonk, ideally you wont need the Board defined per cx (i know thats what im pitching to management here)
+  - Clients:
+    - Prefix: proxy
+      CustomerID: cx
+      Board: dev
