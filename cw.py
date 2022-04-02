@@ -27,8 +27,9 @@ logging.debug(parseList)
 # endregion
 
 # misc and sundry function definition
-#TODO make this whole block obsolete, tag the problems with the connectwise ticket numbers and add callback functions to connectwise
+## TODO: make this whole block obsolete, tag the problems with the connectwise ticket numbers and add callback functions to connectwise
 def add_ticket(problemID: int, ticketID: int):
+    ## TODO: replace hardcoded paths with better relative ones
     ticket_map = shelve.open("/usr/lib/zabbix/alertscripts/tickets.dat")
     ticket_map[str(problemID)] = str(ticketID)
     ticket_map.sync()
@@ -70,7 +71,8 @@ def updateTicket(ticketID: int, update: str):
     return "updated the ticket"
 
 def createTicket(nsev: int, summary: str, body: str, proxy: str = "default"):
-    board, company = "", ''
+    # The zabbix severity to connectwise sev/impact mapping, these values can
+    # be changed if needed, I attempted to set them to sane defaults.
     if nsev <= 2:
         severity = "Low"
         impact = "Low"
@@ -83,19 +85,27 @@ def createTicket(nsev: int, summary: str, body: str, proxy: str = "default"):
     else:
         severity = "Medium"
         impact = "High"
+    # This bit splits the proxy on - to get the prefix for the customer.
+    # used to group multiple proxies to the same company/board
     if proxy.find('-') != -1:
         prefix = proxy.split('-')[0]
     else:
         prefix = proxy
     logging.debug("Found prefix: %s", prefix)
+
+    # Parse the client map from the config file and assign the correct board and company.
+    # assigns to the default first, then changes if it finds the prefix.
+    # WILL BREAK IF YOU HAVE NO CLIENTS defined
+    board = fromYaml['Clients'][0]['Board']
+    company = fromYaml['Clients'][0]['CustomerID']
     for client in fromYaml['Clients']:
         if prefix == client['Prefix']:
             board = client['Board']
             company = client['CustomerID']
-    if board == "":
-        board = fromYaml['Clients'][0]['Board']
-        company = fromYaml['Clients'][0]['CustomerID']
+
     logging.debug("Setting board and company to: %s %s", board, company)
+
+    # Format all the relevant data into the json request
     compilation = f"""
     {{
         "summary": "{summary}",
@@ -123,21 +133,22 @@ def chkVar(value: str):
     if type(value) != int:
         if value[:1:] != '{':
             return True
-
+def sani(data: str):
+    return data.replace("\"", "").replace("\\","")
 # body stuffs, routing the requests
 
 # check for a ticket id and if none found setting to 13 as the default to show its a new ticket
 if parseList.action == "create":
     logging.debug("creating the ticket since the action passed from the template was create")
-    createTicket(data['event_sev'], data['alert_subject'], data['alert_msg'], data['proxy'])
+    createTicket(data['event_sev'], sani(data['alert_subject']), sani(data['alert_msg']), data['proxy'])
 
 elif parseList.action == "update":
     logging.debug("updating the ticket, since the action passed from the template was update")
-    updateTicket(ticketid_from_problemid(data['event_id']), data['update_msg'])
+    updateTicket(ticketid_from_problemid(data['event_id']), sani(data['update_msg']))
 
 elif parseList.action == "close":
     logging.debug("closing the ticket, the action passed from the template was close")
-    updateTicket(ticketid_from_problemid(data['event_id']), data['recovery_status'] + " Closing automagically")
+    updateTicket(ticketid_from_problemid(data['event_id']), sani(data['recovery_status']) + " Closing automagically")
     closeTicket(ticketid_from_problemid(data['event_id']))
     remove_ticket(data['event_id'])
 
