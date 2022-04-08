@@ -173,4 +173,4 @@ elif parseList.action == "close":
     remove_ticket(data['event_id'])
 
 else:
-    fail(f'malformed/incorrect action {parseList.action}, of one of the variables was missing')
+    logging.critical("malformed/incorrect action %s, of one of the variables was missing", parseList.action)
