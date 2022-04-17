@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 
 import sys, requests, logging, argparse, json, shelve, yaml, os
+
+
 def add_ticket(problemID: int, ticketID: int):
-    ## TODO: replace hardcoded paths with better relative ones
+    # TODO: replace hardcoded paths with better relative ones
     ticket_map = shelve.open("/usr/lib/zabbix/alertscripts/tickets.dat")
     ticket_map[str(problemID)] = str(ticketID)
     ticket_map.sync()
