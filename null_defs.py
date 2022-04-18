@@ -1,40 +1,57 @@
-def add_ticket(problemID: int, ticketID: int):
-    ## TODO: replace hardcoded paths with better relative ones
+import logging
+import shelve
+import requests
+import yaml
+
+with open(r'/usr/lib/zabbix/alertscripts/config.yaml') as configFile:
+    fromYaml = yaml.load(configFile, Loader=yaml.FullLoader)
+commonHeaders = {'Authorization': fromYaml['Auth'], 'clientID': fromYaml['ClientID'],
+                 'content-type': 'application/json', 'Accept': 'application/json'}
+baseURL = "https://api-na.myconnectwise.net/v4_6_release/apis/3.0/"
+
+
+def add_ticket(problem_id: int, ticket_id: int):
+    # TODO: replace hardcoded paths with better relative ones
     ticket_map = shelve.open("/usr/lib/zabbix/alertscripts/tickets.dat")
-    ticket_map[str(problemID)] = str(ticketID)
+    ticket_map[str(problem_id)] = str(ticket_id)
     ticket_map.sync()
     ticket_map.close()
-def remove_ticket(problemID: int):
+
+
+def remove_ticket(problem_id: int):
     ticket_map = shelve.open("/usr/lib/zabbix/alertscripts/tickets.dat")
     try:
-        ticket_map.pop(str(problemID))
-    except:
+        ticket_map.pop(str(problem_id))
+    except KeyError:
         logging.error("error removing ticket")
     ticket_map.sync()
     ticket_map.close()
-def ticketid_from_problemid(problemID: int):
+
+
+def ticketid_from_problemid(problem_id: int):
     ticket_map = shelve.open("/usr/lib/zabbix/alertscripts/tickets.dat")
     try:
-        temp = ticket_map[str(problemID)]
-    except:
-        logging.error("error getting ticketid from problem id: %s", problemID)
-    ticket_map.close()
-    return temp
+        temp = ticket_map[str(problem_id)]
+        ticket_map.close()
+        return temp
+    except KeyError:
+        logging.error("error getting ticketid from problem id: %s", problem_id)
 
-def closeTicket(ticketID: int):
 
+def close_ticket(ticket_id: int):
     # close the bloody ticket already
 
     composition = """[{"op": "replace", "path": "status", "value": {"name": "Resolved Pending 24 Hrs"}}]"""
     try:
-        requiem = requests.patch(baseURL + "service/tickets/" + str(ticketID), data=composition, headers=commonHeaders)
+        requiem = requests.patch(baseURL + "service/tickets/" + str(ticket_id), data=composition, headers=commonHeaders)
+        logging.debug("Closing response: %s", requiem.text)
     except requests.exceptions.RequestException as e:
         logging.critical("Closing error: %s", e)
-    logging.debug("Closing response: %s", requiem.text)
+
     return "closed ticket"
 
-def updateTicket(ticketID: int, update: str):
 
+def update_ticket(ticket_id: int, update: str):
     # add update to the ticket body, if acknowledging ticket set it to work in progress.
 
     composition = f"""
@@ -45,14 +62,16 @@ def updateTicket(ticketID: int, update: str):
     """
     logging.debug(composition)
     try:
-        requiem = requests.post(baseURL + "service/tickets/" + str(ticketID) + "/notes", data=composition, headers=commonHeaders)
+        requiem = requests.post(baseURL + "service/tickets/" + str(ticket_id) + "/notes", data=composition,
+                                headers=commonHeaders)
+        logging.debug(requiem)
     except requests.exceptions.RequestException as e:
         logging.critical("Update error: %s", e)
-    logging.debug(requiem)
 
     return "updated the ticket"
 
-def createTicket(nsev: int, summary: str, body: str, proxy: str = "default"):
+
+def create_ticket(problem_id: int, nsev: int, summary: str, body: str, proxy: str = "default"):
     # The zabbix severity to connectwise sev/impact mapping, these values can
     # be changed if needed, I attempted to set them to sane defaults.
     if nsev <= 2:
@@ -103,21 +122,18 @@ def createTicket(nsev: int, summary: str, body: str, proxy: str = "default"):
     logging.debug("body: " + compilation)
     try:
         requiem = requests.post(baseURL + "service/tickets", headers=commonHeaders, data=compilation)
+        logging.debug(requiem.text)
+        add_ticket(problem_id, requiem.json()["id"])
+        logging.debug(requiem)
     except requests.exceptions.RequestException as e:
         logging.critical("Creation error: %s", e)
-    logging.debug(requiem.text)
-    add_ticket(data['event_id'], requiem.json()["id"])
-    logging.debug(requiem)
 
     return "created ticket"
+
 
 def fail(msg: str):
     logging.error("wierd stuff is happening, haaaaaalp. " + msg)
 
-def chkVar(value: str):
-    if type(value) != int:
-        if value[:1:] != '{':
-            return True
 
 def sani(data: str):
-    return data.replace("\\","")
+    return data.replace("\\", "")
