@@ -4,18 +4,6 @@ ClientID: null
 # auth string is companyid+publickey:privatekey base64'd (and yes thats with the + and :, for some reason)
 Auth: Basic null
 
-# Allows you to set the logging level, current options are
-# CRITICAL
-# ERROR
-# WARNING
-# INFO
-# DEBUG
-# NOTSET
-# NOTE: whatever you set it to it will include any higher levels, so ERROR logs error and critical and is a good default
-# while DEBUG will help a good bit with debugging, I dont recommend leaving it on DEBUG indefinitely without a good logrotate setup else you'll just
-# waste disk space.
-logLevel: ERROR
-
 # client list is where I plan on putting the data to replace the expanding if/elif chonk, ideally you wont need the Board defined per cx (i know thats what im pitching to management here)
 # The first client listed here will be the default value used if no other matches are found, as such I dont recommend changing the prefix from default.
 Clients:

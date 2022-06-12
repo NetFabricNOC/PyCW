@@ -7,6 +7,7 @@ with open(r'/usr/lib/zabbix/alertscripts/config.yaml') as configFile:
     fromYaml = yaml.load(configFile, Loader=yaml.FullLoader)
 commonHeaders = {'Authorization': fromYaml['Auth'], 'clientID': fromYaml['ClientID'],
                  'content-type': 'application/json', 'Accept': 'application/json'}
+logging.debug(commonHeaders)
 baseURL = "https://api-na.myconnectwise.net/v4_6_release/apis/3.0/"
 
 
@@ -40,8 +41,8 @@ def ticketid_from_problemid(problem_id: int):
 
 def close_ticket(ticket_id: int):
     # close the bloody ticket already
-
-    composition = """[{"op": "replace", "path": "status", "value": {"name": "Resolved Pending 24 Hrs"}}]"""
+    # changing from resolved pending to closed
+    composition = """[{"op": "replace", "path": "status", "value": {"name": ">Closed"}}]"""
     try:
         requiem = requests.patch(baseURL + "service/tickets/" + str(ticket_id), data=composition, headers=commonHeaders)
         logging.debug("Closing response: %s", requiem.text)

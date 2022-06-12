@@ -4,15 +4,12 @@ import argparse
 import json
 import logging
 import sys
-import yaml
 import null_defs
 
 # region
 # init the logger config and parse the args
-with open(r'/usr/lib/zabbix/alertscripts/config.yaml') as configFile:
-    fromYaml = yaml.load(configFile, Loader=yaml.FullLoader)
 
-logging.basicConfig(filename='/var/log/zabbix/cw.log', level=fromYaml['logLevel'].upper())
+logging.basicConfig(filename='/var/log/zabbix/cw.log', level="ERROR")
 logging.info('processing the parameters into local variables')
 logging.debug(f"Dumping the raw cmd: {sys.argv[0:]}")
 parsletongue = argparse.ArgumentParser(description='Creates/Updates tickets in connectwise from zabbix')
@@ -25,10 +22,6 @@ logging.info('setting the common headers for the request')
 # init config variables
 
 
-commonHeaders = {'Authorization': fromYaml['Auth'], 'clientID': fromYaml['ClientID'],
-                 'content-type': 'application/json', 'Accept': 'application/json'}
-baseURL = "https://api-na.myconnectwise.net/v4_6_release/apis/3.0/"
-logging.debug(commonHeaders)
 parseList = parsletongue.parse_args()
 logging.debug("Payload is type: %s", type(parseList.payload))
 if isinstance(parseList.payload, str):
@@ -37,6 +30,7 @@ if isinstance(parseList.payload, str):
 elif isinstance(parseList.payload, dict):
     data = parseList.payload
 else:
+    data = []
     logging.critical("payload type is: %s", type(parseList.payload))
 logging.debug("dumping the parseList variable:")
 logging.debug(parseList)
@@ -45,7 +39,9 @@ logging.debug(parseList)
 # check for a ticket id and if none found setting to 13 as the default to show its a new ticket
 if parseList.action == "create":
     logging.debug("creating the ticket since the action passed from the template was create")
-    null_defs.create_ticket(data['event_id'], data['event_sev'], data['alert_subject'], data['alert_msg'], data['proxy'])
+    null_defs.create_ticket(data['event_id'], data['event_sev'], data['host_name'] + ": " + data['alert_subject'],
+                            data['alert_msg'],
+                            data['proxy'])
 
 elif parseList.action == "update":
     logging.debug("updating the ticket, since the action passed from the template was update")
@@ -53,7 +49,8 @@ elif parseList.action == "update":
 
 elif parseList.action == "close":
     logging.debug("closing the ticket, the action passed from the template was close")
-    null_defs.update_ticket(null_defs.ticketid_from_problemid(data['event_id']), data['recovery_status'] + " Closing automagically")
+    null_defs.update_ticket(null_defs.ticketid_from_problemid(data['event_id']),
+                            data['recovery_status'] + " Closing automagically")
     null_defs.close_ticket(null_defs.ticketid_from_problemid(data['event_id']))
     null_defs.remove_ticket(data['event_id'])
 
