@@ -1,11 +1,6 @@
-# ClientID is something you have to get from connecwise
-ClientID: null
-
-# auth string is companyid+publickey:privatekey base64'd (and yes thats with the + and :, for some reason)
-Auth: Basic null
-
 # client list is where I plan on putting the data to replace the expanding if/elif chonk, ideally you wont need the Board defined per cx (i know thats what im pitching to management here)
 # The first client listed here will be the default value used if no other matches are found, as such I dont recommend changing the prefix from default.
+Board: NOC
 Clients:
   - Prefix: default
     CustomerID: defaultCX
@@ -16,3 +11,34 @@ Clients:
   - Prefix: otherProxy
     CustomerID: cx2
     Board: noc
+
+# ClientID is something you have to get from connecwise, its basically the api key for their system to identify your
+# application specifically.
+ClientID: null
+
+# the auth key is companyid+publickey:privatekey base64'd, the keys being tied to your account for authentication
+# and will influence the username associated with whatever actions the script takes.
+Auth: Basic null
+
+# This is the zabbix api key for tighter integration, this will help with getting information that cant be passed
+zab_key: null
+
+# Connectwise api url
+capi: https://connectwise
+
+# The zabbix api
+zapi: https://zabbix
+
+# Board to send the tickets to, We have recently migrated from one board per customer to using Company to differentiate
+# between clients and Types for templating.
+Board: NOC
+
+# make sure you set the defaults to something sane, If for any reason the script doesnt find the prefix that its looking
+# for it will default to the first client in the list.
+Clients:
+  - Prefix: default
+    CustomerID: default
+    Type: Template
+  - Prefix: demo
+    CustomerID: DEMO
+    Type: demo

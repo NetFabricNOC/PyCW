@@ -39,7 +39,7 @@ logging.debug(parseList)
 # check for a ticket id and if none found setting to 13 as the default to show its a new ticket
 if parseList.action == "create":
     logging.debug("creating the ticket since the action passed from the template was create")
-    null_defs.create_ticket(data['event_id'], data['event_sev'], data['host_name'] + ": " + data['alert_subject'],
+    null_defs.create_ticket(data['event_id'], data['event_sev'], data['host_name'], data['alert_subject'],
                             data['alert_msg'],
                             data['proxy'])
 
