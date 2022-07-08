@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="93b90036-35b2-45fb-a491-077452e7f48a" name="zabbix.corpo">
+        <fileTransfer rootFolder="/usr/lib/zabbix/alertscripts" accessType="SFTP" host="monitor.corpo" port="22" sshConfigId="e4439a99-7f59-4e72-9609-61ec9a5a0c38" sshConfig="dev@monitor.corpo:22 key" keyPair="true">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

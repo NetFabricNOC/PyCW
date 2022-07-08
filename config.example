@@ -1,0 +1,36 @@
+# ClientID is something you have to get from connecwise, its basically the api key for their system to identify your
+# application specifically.
+ClientID: null
+
+# the auth key is companyid+publickey:privatekey base64'd, the keys being tied to your account for authentication
+# and will influence the username associated with whatever actions the script takes.
+Auth: Basic null
+
+# This is the zabbix api key for tighter integration, this will help with getting information that cant be passed
+zab_key: null
+
+# Connectwise api url
+capi: https://connectwise
+
+# The zabbix api
+zapi: https://zabbix
+
+# Board to send the tickets to, We have recently migrated from one board per customer to using Company to differentiate
+# between clients and Types for templating.
+Board: NOC
+
+# Email addresses to send the alerts to
+alert_q: noc@company.email
+
+# Email address to send from
+noreply: noreply@company.email
+
+# make sure you set the defaults to something sane, If for any reason the script doesnt find the prefix that its looking
+# for it will default to the first client in the list.
+Clients:
+  - Prefix: default
+    CustomerID: default
+    Type: Template
+  - Prefix: demo
+    CustomerID: DEMO
+    Type: demo

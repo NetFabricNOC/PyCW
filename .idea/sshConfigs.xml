@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SshConfigs">
+    <configs>
+      <sshConfig host="monitor.corpo" id="e4439a99-7f59-4e72-9609-61ec9a5a0c38" keyPath="$USER_HOME$/.ssh/canon" port="22" nameFormat="DESCRIPTIVE" username="dev" useOpenSSHConfig="true" />
+    </configs>
+  </component>
+</project>
