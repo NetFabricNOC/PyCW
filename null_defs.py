@@ -1,18 +1,23 @@
 import json
-import logging
+import logging.handlers
+import ecs_logging
 import shelve
-from email.mime.multipart import MIMEMultipart
-
 import requests
 import yaml
-import smtplib
+from sendgrid.helpers.mail import Mail
+
+from sendgrid.sendgrid import SendGridAPIClient
 
 with open(r'/usr/lib/zabbix/alertscripts/config.yaml') as configFile:
     fromYaml = yaml.load(configFile, Loader=yaml.FullLoader)
 commonHeaders = {'Authorization': fromYaml['Auth'], 'clientID': fromYaml['ClientID'],
                  'content-type': 'application/json', 'Accept': 'application/json'}
-logging.basicConfig(filename='/var/log/zabbix/null_defs.log', level="DEBUG")
-logging.debug(commonHeaders)
+loggy = logging.getLogger(__name__)
+loggy.setLevel(logging.DEBUG)
+handy = logging.handlers.WatchedFileHandler('/var/log/zabbix/null_defs.log')
+handy.setFormatter(ecs_logging.StdlibFormatter())
+loggy.addHandler(handy)
+loggy.debug(commonHeaders)
 
 
 def add_ticket(problem_id: int, ticket_id: int):
@@ -28,7 +33,7 @@ def remove_ticket(problem_id: int):
     try:
         ticket_map.pop(str(problem_id))
     except KeyError:
-        logging.error("error removing ticket")
+        loggy.error("error removing ticket", extra={"status": "failure", "problem id": problem_id})
     ticket_map.sync()
     ticket_map.close()
 
@@ -40,7 +45,8 @@ def ticketid_from_problemid(problem_id: int):
         ticket_map.close()
         return temp
     except KeyError:
-        logging.error("error getting ticketid from problem id: %s", problem_id)
+        loggy.error("error getting ticketid from problem id",
+                    extra={"status": "failure", "problem id": problem_id})
 
 
 def close_ticket(ticket_id: int):
@@ -48,25 +54,27 @@ def close_ticket(ticket_id: int):
     # changing from resolved pending to closed
     composition = """[{"op": "replace", "path": "status", "value": {"name": ">Closed"}}]"""
     try:
-        requiem = requests.patch(fromYaml['capi'] + "service/tickets/" + str(ticket_id), data=composition, headers=commonHeaders)
-        logging.debug("Closing response: %s", requiem.text)
+        requiem = requests.patch(fromYaml['capi'] + "service/tickets/" + str(ticket_id), data=composition,
+                                 headers=commonHeaders)
+        loggy.debug(f"{requiem.text}", extra={"status": "success", "ticket number": ticket_id})
     except requests.exceptions.RequestException as e:
-        logging.critical("Closing error: %s", e)
+        loggy.critical(f"{e.response}", extra={"status": "failure", "ticket number": ticket_id})
 
     return "closed ticket"
 
 
-def vimes(error: str, payload: dict):
-    # This is called with whatever relevant data when the script fails to create a ticket.
-    smtcon = smtplib.SMTP(host='smtp.office365.com', port=25)
-    msg = MIMEMultipart()
-    msg['From'] = fromYaml['noreply']
-    msg['To'] = fromYaml['alert_queue']
-    msg['Subject'] = "PyCW error: " + error
-    msg['Body'] = json.dumps(payload)
-    smtcon.sendmail(from_addr=fromYaml['noreply'], to_addrs=fromYaml['alert_q'], msg=f"""Subject: PyCW error: {error}\n\n{json.dumps(payload)}""")
-    smtcon.quit()
-    return "some such nonsense"
+def vimes(error: str, payload=None):
+    if payload is None:
+        payload = []
+    msg = Mail(from_email=fromYaml['noreply'], to_emails=fromYaml['alert_q'], subject=f"PyCW Error",
+               html_content=f"Error: {error}<br />{json.dumps(payload)}")
+    try:
+        sendy = SendGridAPIClient(fromYaml['sg_key'])
+        respondy = sendy.send(msg)
+        loggy.debug(respondy, extra={"status": "success", "type": "debuggy"})
+    except Exception as e:
+        loggy.debug(e.__str__(), extra={"status": "failure", "type": "error"})
+    return "failed successfully"
 
 
 def update_ticket(ticket_id: int, update: str):
@@ -78,13 +86,12 @@ def update_ticket(ticket_id: int, update: str):
         "text": "{update}",
     }}
     """
-    logging.debug(composition)
     try:
         requiem = requests.post(fromYaml['capi'] + "service/tickets/" + str(ticket_id) + "/notes", data=composition,
                                 headers=commonHeaders)
-        logging.debug(requiem)
+        loggy.debug(requiem.text, extra={"status": "success", "type": "debuggy"})
     except requests.exceptions.RequestException as e:
-        logging.critical("Update error: %s", e)
+        loggy.critical(e.response, extra={"status": "failure", "type": "error"})
 
     return "updated the ticket"
 
@@ -110,29 +117,42 @@ def create_ticket(problem_id: int, nsev: int, hostname: str, summary: str, body:
         prefix = proxy.split('-')[0]
     else:
         prefix = proxy
-    logging.debug("Found prefix: %s", prefix)
 
     # Parse the client map from the config file and assign the correct board and company.
     # assigns to the default first, then changes if it finds the prefix.
     # WILL BREAK IF YOU HAVE NO CLIENTS defined
-    ticket_type = ""
-    company = fromYaml['Clients'][0]['CustomerID']
+    company = fromYaml['Default_Company']
+    ticket_type = fromYaml['Default_Type']
+    board = fromYaml['Default_Board']
+    ticket_subtype = fromYaml['Default_SubType']
+    ticket_item = fromYaml['Default_Item']
     for client in fromYaml['Clients']:
         if prefix == client['Prefix']:
             company = client['CustomerID']
-            ticket_type = client['Type']
+            try:
+                ticket_type = client['Type']
+            except KeyError:
+                pass
             try:
                 board = client['Board']
             except KeyError:
-                board = fromYaml['Board']
-
-    logging.debug("Setting board and company to: %s %s", board, company)
+                pass
+            try:
+                ticket_subtype = client['SubType']
+            except KeyError:
+                pass
+            try:
+                ticket_item = client['Item']
+            except KeyError:
+                pass
 
     # Format all the relevant data into the json request
     compilation = f"""
     {{
-        "summary": "{summary}",
+        "summary": "{summary[:86]}",
         "type": {{"name": "{ticket_type}"}},
+        "subType": {{"name": "{ticket_subtype}"}},
+        "item": {{"name": "{ticket_item}"}},
         "recordType": "ServiceTicket",
         "severity": "{severity}",
         "impact": "{impact}",
@@ -141,18 +161,25 @@ def create_ticket(problem_id: int, nsev: int, hostname: str, summary: str, body:
         "company": {{"identifier": "{company}"}}
         }}
         """
-    logging.debug("url: " + fromYaml['capi'])
-    logging.debug("body: " + compilation)
+    loggy.debug(fromYaml['capi'], extra={"variable name": "capi", "type": "debuggy"})
+    loggy.debug("".join(f"{key}, {val};" for key, val in json.loads(compilation).items()),
+                extra={"type": "debuggy", "variable name": "compilation"})
     try:
         requiem = requests.post(fromYaml['capi'] + "service/tickets", headers=commonHeaders, data=compilation)
-        logging.debug(requiem.text)
-        add_ticket(problem_id, requiem.json()["id"])
-        logging.debug(requiem)
+        loggy.debug(requiem.text, extra={"type": "debuggy", "result": "success"})
     except requests.exceptions.RequestException as e:
-        logging.critical("Creation error: %s", e)
+        loggy.critical(e.response, extra={"type": "error", "status": "failure"})
+        vimes(e.response, locals())
+        return "failed"
+    try:
+        add_ticket(problem_id, requiem.json()["id"])
+    except KeyError as e:
+        loggy.critical(e, extra={"type": "error", "status": "failure"})
+        vimes(str(e), locals())
 
     return "created ticket"
 
 
 def sani(data: str) -> str:
-    return data.replace("\\", "")
+    retval = data.replace('"', "").replace("\\", "")
+    return retval.replace("&34", '"')

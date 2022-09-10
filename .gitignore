@@ -1,2 +1,4 @@
 # ignore the config file that has actual data
 config.yaml
+/toprod.sh
+.idea/
